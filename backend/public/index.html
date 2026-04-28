@@ -142,6 +142,18 @@
       overflow-y: auto;
       overscroll-behavior: contain;
       padding-bottom: env(safe-area-inset-bottom, 16px);
+      will-change: transform;
+    }
+    .sheet::before {
+      content: '';
+      display: block;
+      width: 36px;
+      height: 4px;
+      background: var(--tg-theme-hint-color, #ccc);
+      border-radius: 2px;
+      margin: 10px auto 2px;
+      opacity: 0.4;
+      flex-shrink: 0;
     }
     .sheet-header {
       padding: 18px 16px 12px;
@@ -424,6 +436,55 @@ function localSearch(articles, q) {
     .map(a => ({ ...a, snippet: makeSnippet(a.text, terms) }));
 }
 
+function useSwipeDown(ref, onClose) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let startY = 0, dy = 0, active = false;
+
+    function onStart(e) { startY = e.touches[0].clientY; dy = 0; active = false; }
+
+    function onMove(e) {
+      const d = e.touches[0].clientY - startY;
+      if ((el.scrollTop === 0 && d > 8) || active) {
+        active = true;
+        dy = Math.max(0, d);
+        e.preventDefault();
+        el.style.transition = 'none';
+        el.style.transform = `translateY(${dy}px)`;
+        const overlay = el.parentElement;
+        if (overlay) overlay.style.background = `rgba(0,0,0,${(0.45 * Math.max(0, 1 - dy / 300)).toFixed(3)})`;
+      }
+    }
+
+    function onEnd() {
+      if (!active) return;
+      active = false;
+      const overlay = el.parentElement;
+      if (dy > 120) {
+        el.style.transition = 'transform 0.25s ease';
+        el.style.transform = 'translateY(100%)';
+        if (overlay) { overlay.style.transition = 'background 0.25s'; overlay.style.background = 'rgba(0,0,0,0)'; }
+        setTimeout(onClose, 240);
+      } else {
+        el.style.transition = 'transform 0.3s ease';
+        el.style.transform = 'translateY(0)';
+        if (overlay) { overlay.style.transition = ''; overlay.style.background = ''; }
+        setTimeout(() => { if (el) { el.style.transition = ''; } }, 310);
+      }
+    }
+
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+    };
+  }, [onClose]);
+}
+
 function useArticleCache() {
   const [cache, setCache] = useState(() => {
     try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null')?.articles || null; }
@@ -467,6 +528,8 @@ function ArticleSheet({ id, cached, isFav, onToggleFav, onClose }) {
   const [article, setArticle] = useState(cached || null);
   const [err, setErr]         = useState(false);
   const [starAnim, setStarAnim] = useState(false);
+  const sheetRef = useRef(null);
+  useSwipeDown(sheetRef, onClose);
 
   useEffect(() => {
     if (cached) { setArticle(cached); return; }
@@ -497,7 +560,7 @@ function ArticleSheet({ id, cached, isFav, onToggleFav, onClose }) {
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="sheet" onClick={e => e.stopPropagation()}>
+      <div className="sheet" ref={sheetRef} onClick={e => e.stopPropagation()}>
         {err && <p className="loading err">Не удалось загрузить</p>}
         {!article && !err && <p className="loading">Загрузка...</p>}
         {article && <>
@@ -531,6 +594,8 @@ function ArticleSheet({ id, cached, isFav, onToggleFav, onClose }) {
 // ---------------------------------------------------------------------------
 
 function FavoritesSheet({ favs, onOpen, onClose }) {
+  const sheetRef = useRef(null);
+  useSwipeDown(sheetRef, onClose);
   useEffect(() => {
     const w = tg();
     if (!w) return;
@@ -541,7 +606,7 @@ function FavoritesSheet({ favs, onOpen, onClose }) {
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="sheet" onClick={e => e.stopPropagation()}>
+      <div className="sheet" ref={sheetRef} onClick={e => e.stopPropagation()}>
         <div className="sheet-header">
           <h2>Избранное</h2>
           {favs.length > 0 && <p className="sheet-subtitle">{favs.length} ст.</p>}

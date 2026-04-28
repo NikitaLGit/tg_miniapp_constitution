@@ -122,7 +122,7 @@ app.get('/search', (req, res) => {
 app.get('/random', (req, res) => {
   const user = auth(req, res);
   if (!user) return;
-  const row = db.prepare('SELECT id FROM articles ORDER BY RANDOM() LIMIT 1').get();
+  const row = db.prepare('SELECT id, article_number FROM articles ORDER BY RANDOM() LIMIT 1').get();
   res.json(row);
 });
 

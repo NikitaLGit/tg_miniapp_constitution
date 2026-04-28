@@ -315,6 +315,61 @@ const RARITY_LABELS = {
 
 function getRarity(n) { return RARITIES[n] || 'common'; }
 
+function launchConfetti(rarity) {
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:fixed;inset:0;z-index:9999;pointer-events:none';
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+
+  const colors = rarity === 'legendary'
+    ? ['#f57c00', '#ffb300', '#ff6d00', '#ffe082', '#ff8f00']
+    : ['#9c27b0', '#ce93d8', '#7b1fa2', '#e040fb', '#ab47bc'];
+
+  const count = rarity === 'legendary' ? 90 : 60;
+  const cx = canvas.width / 2;
+
+  const particles = Array.from({ length: count }, () => ({
+    x: cx + (Math.random() - 0.5) * 160,
+    y: canvas.height,
+    vx: (Math.random() - 0.5) * 12,
+    vy: -(Math.random() * 16 + 10),
+    w: Math.random() * 9 + 4,
+    h: Math.random() * 5 + 3,
+    rot: Math.random() * Math.PI * 2,
+    rotV: (Math.random() - 0.5) * 0.28,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    opacity: 1,
+  }));
+
+  function tick() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let alive = false;
+    for (const p of particles) {
+      p.x  += p.vx;
+      p.y  += p.vy;
+      p.vy += 0.35;
+      p.vx *= 0.985;
+      p.rot += p.rotV;
+      p.opacity -= 0.013;
+      if (p.opacity > 0 && p.y < canvas.height + 20) {
+        alive = true;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.opacity);
+        ctx.fillStyle = p.color;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      }
+    }
+    if (alive) requestAnimationFrame(tick);
+    else canvas.remove();
+  }
+  requestAnimationFrame(tick);
+}
+
 function RarityBadge({ n }) {
   const r = getRarity(n);
   return <span className={`rarity-badge rarity-${r}`}>{RARITY_LABELS[r]}</span>;
@@ -549,7 +604,11 @@ function App() {
     tg()?.HapticFeedback?.selectionChanged();
     fetch('random', { headers: headers() })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => open(data.id))
+      .then(data => {
+        const r = getRarity(data.article_number);
+        if (r === 'epic' || r === 'legendary') launchConfetti(r);
+        open(data.id);
+      })
       .catch(() => {});
   }
 

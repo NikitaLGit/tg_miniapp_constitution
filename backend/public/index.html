@@ -192,6 +192,27 @@
     }
     .card--dim { opacity: 0.7; }
 
+    /* ---------- Action buttons row ---------- */
+    .action-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .action-btn {
+      flex: 1;
+      height: 38px;
+      border-radius: 10px;
+      border: none;
+      background: var(--tg-theme-secondary-bg-color, #f1f1f1);
+      color: var(--tg-theme-text-color, #000);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s;
+    }
+    .action-btn:active { opacity: 0.65; }
+
     /* ---------- Rarity badge ---------- */
     .rarity-badge {
       display: inline-block;
@@ -405,6 +426,14 @@ function App() {
     document.body.style.overflow = '';
   }
 
+  function openRandom() {
+    tg()?.HapticFeedback?.selectionChanged();
+    fetch('random', { headers: headers() })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => open(data.id))
+      .catch(() => {});
+  }
+
   return (
     <>
       <div className="search-bar">
@@ -426,7 +455,12 @@ function App() {
       </div>
 
       <div className="results">
-        {!query && <Welcome onOpen={open} />}
+        {!query && <>
+          <div className="action-row">
+            <button className="action-btn" onClick={openRandom}>Мне повезёт</button>
+          </div>
+          <Welcome onOpen={open} />
+        </>}
         {query && loading && <p className="hint">Поиск...</p>}
         {query && !loading && err && <p className="hint err">Ошибка поиска</p>}
         {query && !loading && !err && results.length === 0 && <p className="hint">Ничего не найдено</p>}

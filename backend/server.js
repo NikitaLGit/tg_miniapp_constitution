@@ -118,6 +118,14 @@ app.get('/search', (req, res) => {
   res.json(rows);
 });
 
+// GET /random  →  random article id
+app.get('/random', (req, res) => {
+  const user = auth(req, res);
+  if (!user) return;
+  const row = db.prepare('SELECT id FROM articles ORDER BY RANDOM() LIMIT 1').get();
+  res.json(row);
+});
+
 // GET /article/:id  →  full article
 app.get('/article/:id', (req, res) => {
   const user = auth(req, res);

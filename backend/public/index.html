@@ -386,6 +386,62 @@ function useDebounce(val, ms) {
   return v;
 }
 
+// ---------------------------------------------------------------------------
+// Offline cache
+// ---------------------------------------------------------------------------
+
+const CACHE_KEY = 'constitution_v1';
+
+function makeSnippet(text, terms) {
+  const lower = text.toLowerCase();
+  let start = 0;
+  for (const t of terms) {
+    const idx = lower.indexOf(t);
+    if (idx !== -1) { start = Math.max(0, idx - 50); break; }
+  }
+  let snippet = text.slice(start, start + 220);
+  if (start > 0) snippet = '...' + snippet;
+  if (start + 220 < text.length) snippet += '...';
+  for (const t of terms) {
+    const esc = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    snippet = snippet.replace(new RegExp(`(${esc})(\\S*)`, 'gi'), '<b>$1</b>$2');
+  }
+  return snippet;
+}
+
+function localSearch(articles, q) {
+  q = q.trim();
+  if (!q) return [];
+  if (/^\d+$/.test(q)) {
+    return articles.filter(a => a.article_number === parseInt(q, 10)).slice(0, 20);
+  }
+  const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return [];
+  return articles
+    .filter(a => { const h = (a.title + ' ' + a.text).toLowerCase(); return terms.every(t => h.includes(t)); })
+    .sort((a, b) => a.article_number - b.article_number)
+    .slice(0, 20)
+    .map(a => ({ ...a, snippet: makeSnippet(a.text, terms) }));
+}
+
+function useArticleCache() {
+  const [cache, setCache] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null')?.articles || null; }
+    catch { return null; }
+  });
+  useEffect(() => {
+    if (cache) return;
+    fetch('articles', { headers: headers() })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(articles => {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ articles }));
+        setCache(articles);
+      })
+      .catch(() => {});
+  }, []);
+  return cache;
+}
+
 function useFavorites() {
   const [favs, setFavs] = useState(() => {
     try { return JSON.parse(localStorage.getItem('favs') || '[]'); } catch { return []; }
@@ -407,18 +463,19 @@ function useFavorites() {
 // Article modal
 // ---------------------------------------------------------------------------
 
-function ArticleSheet({ id, isFav, onToggleFav, onClose }) {
-  const [article, setArticle] = useState(null);
+function ArticleSheet({ id, cached, isFav, onToggleFav, onClose }) {
+  const [article, setArticle] = useState(cached || null);
   const [err, setErr]         = useState(false);
   const [starAnim, setStarAnim] = useState(false);
 
   useEffect(() => {
+    if (cached) { setArticle(cached); return; }
     setArticle(null); setErr(false);
     fetch(`article/${id}`, { headers: headers() })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(setArticle)
       .catch(() => setErr(true));
-  }, [id]);
+  }, [id, cached]);
 
   useEffect(() => {
     const w = tg();
@@ -519,7 +576,7 @@ const EXAMPLES = [
   { id: 29, article_number: 29, chapter: 'Глава 2', preview: 'Каждому гарантируется свобода мысли и слова. Никто не может быть принуждён к выражению своих мнений.' },
 ];
 
-function Welcome({ onOpen }) {
+function Welcome({ onOpen, cached }) {
   return (
     <>
       <div className="welcome">
@@ -539,6 +596,7 @@ function Welcome({ onOpen }) {
         ))}
       </div>
       <p className="welcome-footer">
+        {cached && <span style={{color:'#43a047', marginRight: 6}}>● офлайн</span>}
         2026 lns.{' '}
         <a href="https://github.com/NikitaLGit/tg_miniapp_constitution" target="_blank" rel="noreferrer">github</a>
       </p>
@@ -558,6 +616,7 @@ function App() {
   const [selected, setSelected] = useState(null);
   const [showFavs, setShowFavs] = useState(false);
   const { favs, isFav, toggle } = useFavorites();
+  const cache = useArticleCache();
   const inputRef = useRef(null);
 
   const dq = useDebounce(query, 300);
@@ -566,12 +625,17 @@ function App() {
 
   useEffect(() => {
     if (!dq.trim()) { setResults([]); return; }
+    if (cache) {
+      setResults(localSearch(cache, dq));
+      setLoading(false);
+      return;
+    }
     setLoading(true); setErr(false);
     fetch(`search?q=${encodeURIComponent(dq)}`, { headers: headers() })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => { setResults(data); setLoading(false); })
       .catch(() => { setErr(true); setLoading(false); });
-  }, [dq]);
+  }, [dq, cache]);
 
   function clear() { setQuery(''); setResults([]); inputRef.current?.focus(); }
   function open(id) {
@@ -638,7 +702,7 @@ function App() {
             <button className="action-btn" onClick={openRandom}>Мне повезёт</button>
             <button className="action-btn" onClick={openFavs}>Избранное{favs.length > 0 ? ` ${favs.length}` : ''}</button>
           </div>
-          <Welcome onOpen={open} />
+          <Welcome onOpen={open} cached={!!cache} />
         </>}
         {query && loading && <p className="hint">Поиск...</p>}
         {query && !loading && err && <p className="hint err">Ошибка поиска</p>}
@@ -661,7 +725,13 @@ function App() {
       </div>
 
       {selected && (
-        <ArticleSheet id={selected} isFav={isFav} onToggleFav={toggle} onClose={close} />
+        <ArticleSheet
+          id={selected}
+          cached={cache?.find(a => a.id === selected) || null}
+          isFav={isFav}
+          onToggleFav={toggle}
+          onClose={close}
+        />
       )}
       {showFavs && (
         <FavoritesSheet favs={favs} onOpen={openFromFavs} onClose={closeFavs} />

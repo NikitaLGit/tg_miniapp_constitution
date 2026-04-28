@@ -118,6 +118,14 @@ app.get('/search', (req, res) => {
   res.json(rows);
 });
 
+// GET /articles  →  all articles (for offline cache)
+app.get('/articles', (req, res) => {
+  const user = auth(req, res);
+  if (!user) return;
+  const rows = db.prepare('SELECT id, article_number, chapter, title, text FROM articles ORDER BY article_number ASC').all();
+  res.json(rows);
+});
+
 // GET /random  →  random article id
 app.get('/random', (req, res) => {
   const user = auth(req, res);

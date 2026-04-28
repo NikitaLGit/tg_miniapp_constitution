@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Конституция РФ</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--tg-theme-bg-color, #ffffff);
+      color: var(--tg-theme-text-color, #000000);
+      min-height: 100dvh;
+      overscroll-behavior: none;
+    }
+
+    /* ---------- Search bar ---------- */
+    .search-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--tg-theme-bg-color, #fff);
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--tg-theme-secondary-bg-color, #f1f1f1);
+    }
+    .search-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      width: 18px;
+      height: 18px;
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    .search-input {
+      width: 100%;
+      height: 40px;
+      padding: 0 34px 0 36px;
+      border-radius: 10px;
+      border: none;
+      background: var(--tg-theme-secondary-bg-color, #f1f1f1);
+      color: var(--tg-theme-text-color, #000);
+      font-size: 16px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    .search-input::placeholder { color: var(--tg-theme-hint-color, #aaa); }
+    .search-input::-webkit-search-cancel-button { display: none; }
+    .clear-btn {
+      position: absolute;
+      right: 6px;
+      background: none;
+      border: none;
+      font-size: 18px;
+      color: var(--tg-theme-hint-color, #aaa);
+      cursor: pointer;
+      padding: 4px 6px;
+      line-height: 1;
+    }
+
+    /* ---------- Results ---------- */
+    .results {
+      padding: 8px 12px 32px;
+    }
+    .hint {
+      text-align: center;
+      font-size: 14px;
+      color: var(--tg-theme-hint-color, #999);
+      padding: 40px 0;
+    }
+    .err { color: #e53935; }
+
+    /* ---------- Card ---------- */
+    .card {
+      background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s;
+    }
+    .card:active { opacity: 0.65; }
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .art-num {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--tg-theme-button-color, #2481cc);
+    }
+    .art-chapter {
+      font-size: 12px;
+      color: var(--tg-theme-hint-color, #999);
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      line-height: 1.35;
+    }
+    .card-snippet {
+      font-size: 13px;
+      color: var(--tg-theme-hint-color, #999);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-snippet b {
+      color: var(--tg-theme-text-color, #000);
+      font-weight: 600;
+    }
+
+    /* ---------- Modal (bottom sheet) ---------- */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(0,0,0,0.45);
+      display: flex;
+      align-items: flex-end;
+    }
+    .sheet {
+      background: var(--tg-theme-bg-color, #fff);
+      border-radius: 18px 18px 0 0;
+      width: 100%;
+      max-height: 92dvh;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-bottom: env(safe-area-inset-bottom, 16px);
+    }
+    .sheet-header {
+      padding: 18px 16px 12px;
+      border-bottom: 1px solid var(--tg-theme-secondary-bg-color, #f1f1f1);
+      position: sticky;
+      top: 0;
+      background: var(--tg-theme-bg-color, #fff);
+    }
+    .sheet-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--tg-theme-button-color, #2481cc);
+      background: var(--tg-theme-secondary-bg-color, #e8f0fe);
+      border-radius: 6px;
+      padding: 2px 8px;
+      margin-bottom: 8px;
+    }
+    .sheet-header h2 { font-size: 20px; font-weight: 700; margin-bottom: 3px; }
+    .sheet-subtitle { font-size: 13px; color: var(--tg-theme-hint-color, #999); }
+    .sheet-body {
+      padding: 16px;
+    }
+    .sheet-body p {
+      font-size: 15px;
+      line-height: 1.75;
+      margin-bottom: 10px;
+    }
+    .loading {
+      text-align: center;
+      color: var(--tg-theme-hint-color, #999);
+      padding: 32px;
+      font-size: 14px;
+    }
+
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+function tg() { return window.Telegram?.WebApp; }
+function initData() { return tg()?.initData || ''; }
+
+const headers = () => ({ 'x-init-data': initData() });
+
+function useDebounce(val, ms) {
+  const [v, setV] = useState(val);
+  useEffect(() => { const t = setTimeout(() => setV(val), ms); return () => clearTimeout(t); }, [val, ms]);
+  return v;
+}
+
+// ---------------------------------------------------------------------------
+// Article modal
+// ---------------------------------------------------------------------------
+
+function ArticleSheet({ id, onClose }) {
+  const [article, setArticle] = useState(null);
+  const [err, setErr]         = useState(false);
+
+  useEffect(() => {
+    setArticle(null); setErr(false);
+    fetch(`article/${id}`, { headers: headers() })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(setArticle)
+      .catch(() => setErr(true));
+  }, [id]);
+
+  useEffect(() => {
+    const w = tg();
+    if (!w) return;
+    w.BackButton.show();
+    w.BackButton.onClick(onClose);
+    return () => { w.BackButton.hide(); w.BackButton.offClick(onClose); };
+  }, [onClose]);
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet" onClick={e => e.stopPropagation()}>
+        {err && <p className="loading err">Не удалось загрузить</p>}
+        {!article && !err && <p className="loading">Загрузка...</p>}
+        {article && <>
+          <div className="sheet-header">
+            <div className="sheet-badge">{article.chapter}</div>
+            <h2>Статья {article.article_number}</h2>
+            <p className="sheet-subtitle">{article.title}</p>
+          </div>
+          <div className="sheet-body">
+            {article.text.split('\n').map((line, i) =>
+              line.trim() ? <p key={i}>{line.trim()}</p> : null
+            )}
+          </div>
+        </>}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main App
+// ---------------------------------------------------------------------------
+
+function App() {
+  const [query,    setQuery]    = useState('');
+  const [results,  setResults]  = useState([]);
+  const [loading,  setLoading]  = useState(false);
+  const [err,      setErr]      = useState(false);
+  const [selected, setSelected] = useState(null);
+  const inputRef = useRef(null);
+
+  const dq = useDebounce(query, 300);
+
+  useEffect(() => { tg()?.ready(); tg()?.expand(); }, []);
+
+  useEffect(() => {
+    if (!dq.trim()) { setResults([]); return; }
+    setLoading(true); setErr(false);
+    fetch(`search?q=${encodeURIComponent(dq)}`, { headers: headers() })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => { setResults(data); setLoading(false); })
+      .catch(() => { setErr(true); setLoading(false); });
+  }, [dq]);
+
+  function clear() { setQuery(''); setResults([]); inputRef.current?.focus(); }
+  function open(id) {
+    setSelected(id);
+    document.body.style.overflow = 'hidden';
+    tg()?.HapticFeedback?.selectionChanged();
+  }
+
+  function close() {
+    setSelected(null);
+    document.body.style.overflow = '';
+  }
+
+  return (
+    <>
+      <div className="search-bar">
+        <div className="search-wrap">
+          <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            ref={inputRef}
+            type="search"
+            className="search-input"
+            placeholder="Номер статьи или слово..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            autoFocus
+          />
+          {query && <button className="clear-btn" onClick={clear}>×</button>}
+        </div>
+      </div>
+
+      <div className="results">
+        {!query && <p className="hint">Введите номер или слова из статьи</p>}
+        {query && loading && <p className="hint">Поиск...</p>}
+        {query && !loading && err && <p className="hint err">Ошибка поиска</p>}
+        {query && !loading && !err && results.length === 0 && <p className="hint">Ничего не найдено</p>}
+
+        {results.map(item => (
+          <div key={item.id} className="card" onClick={() => open(item.id)}>
+            <div className="card-meta">
+              <span className="art-num">Ст. {item.article_number}</span>
+              <span className="art-chapter">{item.chapter}</span>
+            </div>
+            <div className="card-title">{item.title}</div>
+            <div
+              className="card-snippet"
+              dangerouslySetInnerHTML={{ __html: item.snippet || '' }}
+            />
+          </div>
+        ))}
+      </div>
+
+      {selected && (
+        <ArticleSheet id={selected} onClose={close} />
+      )}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

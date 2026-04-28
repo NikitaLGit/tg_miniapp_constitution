@@ -1,0 +1,14 @@
+services:
+  constitution-backend:
+    build: ./backend
+    container_name: constitution-backend
+    restart: unless-stopped
+    env_file: ./backend/.env
+    ports:
+      - "3002:3002"
+    networks:
+      - app_default
+
+networks:
+  app_default:
+    external: true

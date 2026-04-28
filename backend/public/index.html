@@ -192,6 +192,34 @@
     }
     .card--dim { opacity: 0.7; }
 
+    /* ---------- Star / Favorites ---------- */
+    .star-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      color: var(--tg-theme-hint-color, #ccc);
+      -webkit-tap-highlight-color: transparent;
+      line-height: 0;
+    }
+    .star-btn.starred { color: #f5a623; }
+    @keyframes star-pop {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.5); }
+      100% { transform: scale(1); }
+    }
+    .star-pop { animation: star-pop 0.28s ease; }
+    .fav-empty {
+      text-align: center;
+      padding: 48px 16px;
+      font-size: 14px;
+      color: var(--tg-theme-hint-color, #999);
+      line-height: 1.6;
+    }
+
     /* ---------- Action buttons row ---------- */
     .action-row {
       display: flex;
@@ -303,13 +331,31 @@ function useDebounce(val, ms) {
   return v;
 }
 
+function useFavorites() {
+  const [favs, setFavs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('favs') || '[]'); } catch { return []; }
+  });
+  const isFav = useCallback((id) => favs.some(f => f.id === id), [favs]);
+  const toggle = useCallback((article) => {
+    setFavs(prev => {
+      const next = prev.some(f => f.id === article.id)
+        ? prev.filter(f => f.id !== article.id)
+        : [...prev, { id: article.id, article_number: article.article_number, chapter: article.chapter, title: article.title }];
+      localStorage.setItem('favs', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+  return { favs, isFav, toggle };
+}
+
 // ---------------------------------------------------------------------------
 // Article modal
 // ---------------------------------------------------------------------------
 
-function ArticleSheet({ id, onClose }) {
+function ArticleSheet({ id, isFav, onToggleFav, onClose }) {
   const [article, setArticle] = useState(null);
   const [err, setErr]         = useState(false);
+  const [starAnim, setStarAnim] = useState(false);
 
   useEffect(() => {
     setArticle(null); setErr(false);
@@ -327,6 +373,16 @@ function ArticleSheet({ id, onClose }) {
     return () => { w.BackButton.hide(); w.BackButton.offClick(onClose); };
   }, [onClose]);
 
+  function handleStar() {
+    if (!article) return;
+    tg()?.HapticFeedback?.selectionChanged();
+    setStarAnim(true);
+    setTimeout(() => setStarAnim(false), 300);
+    onToggleFav(article);
+  }
+
+  const starred = isFav(id);
+
   return (
     <div className="overlay" onClick={onClose}>
       <div className="sheet" onClick={e => e.stopPropagation()}>
@@ -334,6 +390,12 @@ function ArticleSheet({ id, onClose }) {
         {!article && !err && <p className="loading">Загрузка...</p>}
         {article && <>
           <div className="sheet-header">
+            <button className={`star-btn${starred ? ' starred' : ''}`} onClick={handleStar}>
+              <svg className={starAnim ? 'star-pop' : ''} width="22" height="22" viewBox="0 0 24 24"
+                fill={starred ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            </button>
             <div className="sheet-header-meta">
               <div className="sheet-badge">{article.chapter}</div>
               <RarityBadge n={article.article_number} />
@@ -347,6 +409,46 @@ function ArticleSheet({ id, onClose }) {
             )}
           </div>
         </>}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Favorites sheet
+// ---------------------------------------------------------------------------
+
+function FavoritesSheet({ favs, onOpen, onClose }) {
+  useEffect(() => {
+    const w = tg();
+    if (!w) return;
+    w.BackButton.show();
+    w.BackButton.onClick(onClose);
+    return () => { w.BackButton.hide(); w.BackButton.offClick(onClose); };
+  }, [onClose]);
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet" onClick={e => e.stopPropagation()}>
+        <div className="sheet-header">
+          <h2>Избранное</h2>
+          {favs.length > 0 && <p className="sheet-subtitle">{favs.length} ст.</p>}
+        </div>
+        <div className="sheet-body">
+          {favs.length === 0 && (
+            <p className="fav-empty">Пока ничего нет.<br/>Нажмите ★ при чтении статьи.</p>
+          )}
+          {favs.map(item => (
+            <div key={item.id} className="card" onClick={() => onOpen(item.id)}>
+              <div className="card-meta">
+                <span className="art-num">Ст. {item.article_number}</span>
+                <span className="art-chapter">{item.chapter}</span>
+                <RarityBadge n={item.article_number} />
+              </div>
+              <div className="card-title">{item.title}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -399,6 +501,8 @@ function App() {
   const [loading,  setLoading]  = useState(false);
   const [err,      setErr]      = useState(false);
   const [selected, setSelected] = useState(null);
+  const [showFavs, setShowFavs] = useState(false);
+  const { favs, isFav, toggle } = useFavorites();
   const inputRef = useRef(null);
 
   const dq = useDebounce(query, 300);
@@ -424,6 +528,21 @@ function App() {
   function close() {
     setSelected(null);
     document.body.style.overflow = '';
+  }
+
+  function openFavs() {
+    setShowFavs(true);
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeFavs() {
+    setShowFavs(false);
+    document.body.style.overflow = '';
+  }
+
+  function openFromFavs(id) {
+    setShowFavs(false);
+    open(id);
   }
 
   function openRandom() {
@@ -458,6 +577,7 @@ function App() {
         {!query && <>
           <div className="action-row">
             <button className="action-btn" onClick={openRandom}>Мне повезёт</button>
+            <button className="action-btn" onClick={openFavs}>Избранное{favs.length > 0 ? ` ${favs.length}` : ''}</button>
           </div>
           <Welcome onOpen={open} />
         </>}
@@ -482,7 +602,10 @@ function App() {
       </div>
 
       {selected && (
-        <ArticleSheet id={selected} onClose={close} />
+        <ArticleSheet id={selected} isFav={isFav} onToggleFav={toggle} onClose={close} />
+      )}
+      {showFavs && (
+        <FavoritesSheet favs={favs} onOpen={openFromFavs} onClose={closeFavs} />
       )}
     </>
   );

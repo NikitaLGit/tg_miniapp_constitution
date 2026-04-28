@@ -231,6 +231,23 @@
       color: var(--tg-theme-hint-color, #999);
       line-height: 1.6;
     }
+    .easter-egg {
+      text-align: center;
+      padding: 48px 16px 16px;
+      animation: egg-in 0.35s ease;
+    }
+    .easter-egg p { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
+    .easter-egg a {
+      font-size: 14px;
+      color: var(--tg-theme-button-color, #2481cc);
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    @keyframes egg-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
 
     /* ---------- Action buttons row ---------- */
     .action-row {
@@ -685,11 +702,12 @@ function App() {
   const inputRef = useRef(null);
 
   const dq = useDebounce(query, 300);
+  const isEgg = dq.trim().toLowerCase() === 'я люблю свободу';
 
   useEffect(() => { tg()?.ready(); tg()?.expand(); }, []);
 
   useEffect(() => {
-    if (!dq.trim()) { setResults([]); return; }
+    if (!dq.trim() || isEgg) { setResults([]); return; }
     if (cache) {
       setResults(localSearch(cache, dq));
       setLoading(false);
@@ -700,7 +718,7 @@ function App() {
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => { setResults(data); setLoading(false); })
       .catch(() => { setErr(true); setLoading(false); });
-  }, [dq, cache]);
+  }, [dq, cache, isEgg]);
 
   function clear() { setQuery(''); setResults([]); inputRef.current?.focus(); }
   function open(id) {
@@ -769,9 +787,15 @@ function App() {
           </div>
           <Welcome onOpen={open} cached={!!cache} />
         </>}
-        {query && loading && <p className="hint">Поиск...</p>}
-        {query && !loading && err && <p className="hint err">Ошибка поиска</p>}
-        {query && !loading && !err && results.length === 0 && <p className="hint">Ничего не найдено</p>}
+        {isEgg && (
+          <div className="easter-egg">
+            <p>Я тоже.</p>
+            <a onClick={() => open(29)}>Вот ссылка →</a>
+          </div>
+        )}
+        {!isEgg && query && loading && <p className="hint">Поиск...</p>}
+        {!isEgg && query && !loading && err && <p className="hint err">Ошибка поиска</p>}
+        {!isEgg && query && !loading && !err && results.length === 0 && <p className="hint">Ничего не найдено</p>}
 
         {results.map(item => (
           <div key={item.id} className="card" onClick={() => open(item.id)}>

@@ -177,12 +177,99 @@
       font-size: 14px;
     }
 
+    .welcome {
+      padding: 16px 2px 14px;
+    }
+    .welcome-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .welcome-sub {
+      font-size: 13px;
+      color: var(--tg-theme-hint-color, #999);
+      line-height: 1.55;
+    }
+    .card--dim { opacity: 0.7; }
+
+    /* ---------- Rarity badge ---------- */
+    .rarity-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 6px;
+      padding: 2px 7px;
+      white-space: nowrap;
+    }
+    .rarity-common    { color: #9e9e9e; background: rgba(158,158,158,0.13); }
+    .rarity-uncommon  { color: #43a047; background: rgba(67,160,71,0.13); }
+    .rarity-rare      { color: #1e88e5; background: rgba(30,136,229,0.13); }
+    .rarity-epic      { color: #9c27b0; background: rgba(156,39,176,0.13); }
+    .rarity-legendary { color: #f57c00; background: rgba(245,124,0,0.13); }
+    .card-meta .rarity-badge { margin-left: auto; }
+
+    /* sheet-header badges row */
+    .sheet-header-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .sheet-header-meta .sheet-badge { margin-bottom: 0; }
+
+    .welcome-footer {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 12px;
+      color: var(--tg-theme-hint-color, #999);
+    }
+    .welcome-footer a {
+      color: var(--tg-theme-button-color, #2481cc);
+      text-decoration: none;
+    }
+
   </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
+
+// ---------------------------------------------------------------------------
+// Rarity system
+// ---------------------------------------------------------------------------
+
+const RARITIES = {
+  1:'legendary', 2:'legendary', 7:'legendary', 10:'legendary', 17:'legendary', 29:'legendary',
+  3:'epic', 4:'epic', 13:'epic', 15:'epic', 18:'epic', 20:'epic', 21:'epic', 22:'epic',
+  35:'epic', 46:'epic', 55:'epic', 80:'epic', 81:'epic', 93:'epic', 135:'epic',
+  5:'rare', 6:'rare', 8:'rare', 9:'rare', 11:'rare', 12:'rare', 14:'rare', 16:'rare',
+  19:'rare', 23:'rare', 25:'rare', 28:'rare', 31:'rare', 37:'rare', 40:'rare',
+  41:'rare', 42:'rare', 43:'rare', 44:'rare', 45:'rare', 47:'rare', 65:'rare',
+  94:'rare', 110:'rare', 118:'rare',
+  24:'uncommon', 26:'uncommon', 27:'uncommon', 30:'uncommon', 32:'uncommon', 33:'uncommon',
+  34:'uncommon', 36:'uncommon', 38:'uncommon', 39:'uncommon', 48:'uncommon', 49:'uncommon',
+  50:'uncommon', 51:'uncommon', 52:'uncommon', 53:'uncommon', 54:'uncommon', 56:'uncommon',
+  57:'uncommon', 58:'uncommon', 59:'uncommon', 60:'uncommon', 61:'uncommon', 62:'uncommon',
+  63:'uncommon', 64:'uncommon', 66:'uncommon', 67:'uncommon', 68:'uncommon', 69:'uncommon',
+  78:'uncommon', 79:'uncommon', 82:'uncommon', 83:'uncommon', 84:'uncommon', 85:'uncommon',
+  86:'uncommon', 87:'uncommon', 88:'uncommon', 89:'uncommon',
+};
+
+const RARITY_LABELS = {
+  common: 'Обычная', uncommon: 'Необычная', rare: 'Редкая',
+  epic: 'Эпическая', legendary: 'Легендарная',
+};
+
+function getRarity(n) { return RARITIES[n] || 'common'; }
+
+function RarityBadge({ n }) {
+  const r = getRarity(n);
+  return <span className={`rarity-badge rarity-${r}`}>{RARITY_LABELS[r]}</span>;
+}
 
 function tg() { return window.Telegram?.WebApp; }
 function initData() { return tg()?.initData || ''; }
@@ -226,7 +313,10 @@ function ArticleSheet({ id, onClose }) {
         {!article && !err && <p className="loading">Загрузка...</p>}
         {article && <>
           <div className="sheet-header">
-            <div className="sheet-badge">{article.chapter}</div>
+            <div className="sheet-header-meta">
+              <div className="sheet-badge">{article.chapter}</div>
+              <RarityBadge n={article.article_number} />
+            </div>
             <h2>Статья {article.article_number}</h2>
             <p className="sheet-subtitle">{article.title}</p>
           </div>
@@ -238,6 +328,43 @@ function ArticleSheet({ id, onClose }) {
         </>}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Welcome screen — hardcoded, no fetch needed
+// ---------------------------------------------------------------------------
+
+const EXAMPLES = [
+  { id: 22, article_number: 22, chapter: 'Глава 2', preview: 'Каждый имеет право на свободу и личную неприкосновенность. Арест допускается только по судебному решению.' },
+  { id: 23, article_number: 23, chapter: 'Глава 2', preview: 'Каждый имеет право на неприкосновенность частной жизни, личную и семейную тайну, защиту чести и доброго имени.' },
+  { id: 29, article_number: 29, chapter: 'Глава 2', preview: 'Каждому гарантируется свобода мысли и слова. Никто не может быть принуждён к выражению своих мнений.' },
+];
+
+function Welcome({ onOpen }) {
+  return (
+    <>
+      <div className="welcome">
+        <p className="welcome-title">Конституция РФ</p>
+        <p className="welcome-sub">Поиск по номеру или словам. Поддерживается частичный ввод — например, «свобо» или «президе».</p>
+      </div>
+      <div className="examples">
+        {EXAMPLES.map(item => (
+          <div key={item.id} className="card card--dim" onClick={() => onOpen(item.id)}>
+            <div className="card-meta">
+              <span className="art-num">Ст. {item.article_number}</span>
+              <span className="art-chapter">{item.chapter}</span>
+              <RarityBadge n={item.article_number} />
+            </div>
+            <div className="card-snippet">{item.preview}</div>
+          </div>
+        ))}
+      </div>
+      <p className="welcome-footer">
+        2026 lns.{' '}
+        <a href="https://github.com/NikitaLGit/tg_miniapp_constitution" target="_blank" rel="noreferrer">github</a>
+      </p>
+    </>
   );
 }
 
@@ -299,7 +426,7 @@ function App() {
       </div>
 
       <div className="results">
-        {!query && <p className="hint">Введите номер или слова из статьи</p>}
+        {!query && <Welcome onOpen={open} />}
         {query && loading && <p className="hint">Поиск...</p>}
         {query && !loading && err && <p className="hint err">Ошибка поиска</p>}
         {query && !loading && !err && results.length === 0 && <p className="hint">Ничего не найдено</p>}
@@ -309,6 +436,7 @@ function App() {
             <div className="card-meta">
               <span className="art-num">Ст. {item.article_number}</span>
               <span className="art-chapter">{item.chapter}</span>
+              <RarityBadge n={item.article_number} />
             </div>
             <div className="card-title">{item.title}</div>
             <div
